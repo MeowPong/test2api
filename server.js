@@ -1,59 +1,42 @@
-const express = require('express')
+// server.js
+const express = require('express');
+const cors = require('cors');
 const sql = require('mssql');
+require('dotenv').config();
 
-const app = express()
+const app = express();
 
-// database url
-const config = {
-    user: 'teddy@teddyserver',
-    password: 'Meow@1234',
-    server: 'teddyserver.database.windows.net',
-    database: 'teddydatabase',
-    options: {
-        encrypt: true,
-        trustServerCertificate: false,
-        hostNameInCertificate: '*.database.windows.net'
+const port = process.env.PORT || 3000;
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+
+// Database config
+const config = require('./config/dbConfig');
+
+const connectDB = async () => {
+    try {
+        await sql.connect(config);
+        console.log('Connected to SQL Server');
+    } catch (err) {
+        console.log('connection failed', err);
     }
 };
 
-// connect database
-sql.connect(config)
-   .then(() => console.log('Connected to SQL Server'))
-   .catch(err => console.error('Database connection failed:', err));
+// Connect to the database
+connectDB();
+
+// Route import
+const productRouter = require('./routes/product.Routes');
+const saleRouter = require('./routes/sale.Routes');
+const userRouter = require('./routes/user.Routes');
 
 
-app.get('/', (req, res) => {
-  res.send('Hello World')
-})
+// Routes
+app.use(productRouter);
+app.use(saleRouter);
+app.use(userRouter);
 
 
-// get all from product table order desc
-app.get('/list', async (req, res) => {
-    try {
-        await sql.connect(config);
-
-        const request = new sql.Request();
-        const result = await request
-            .input('status', sql.NVarChar, 'use')
-            .query(`
-                SELECT *
-                FROM Product
-                WHERE status = @status
-                ORDER BY id DESC
-            `);
-
-        res.send({ results: result.recordset });
-
-    } catch (e) {
-        console.error(e);
-        res.status(500).send({ error: e.message });
-    } finally {
-        await sql.close();
-    }
-});
-
-
-
-app.listen(3000, () => {
-  console.log('Start server at port 3000.')
-})
+app.listen(port, () => console.log(`Server running on port ${port}`));
