@@ -37,7 +37,7 @@ function getUserId(req, res) {
     }
 }
 
-router.post('/api/signIn', async (req, res) => {
+router.post('/signIn', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -66,7 +66,7 @@ router.post('/api/signIn', async (req, res) => {
     }
 });
 
-router.get('/api/info', checkSignIn, async (req, res) => {
+router.get('/info', checkSignIn, async (req, res) => {
     try {
         const userId = getUserId(req, res);
         await sql.connect(config);

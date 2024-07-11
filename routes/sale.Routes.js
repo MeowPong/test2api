@@ -6,7 +6,7 @@ const router = express.Router();
 const config = require('../config/dbConfig');
 
 // save order
-router.post('/api/save', async (req, res) => {
+router.post('/save', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -54,9 +54,9 @@ router.post('/api/save', async (req, res) => {
     }
 });
 
-//    /list เดิม
+
 // Sale Bill Report
-router.get('/api/billreport', async (req, res) => {
+router.get('/list', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -74,7 +74,7 @@ router.get('/api/billreport', async (req, res) => {
 });
 
 // bill info
-router.get('/api/billInfo/:billSaleId', async (req, res) => {
+router.get('/billInfo/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -97,7 +97,7 @@ router.get('/api/billInfo/:billSaleId', async (req, res) => {
 });
 
 // update bill status to pay
-router.get('/api/updateStatusToPay/:billSaleId', async (req, res) => {
+router.get('/updateStatusToPay/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -118,7 +118,7 @@ router.get('/api/updateStatusToPay/:billSaleId', async (req, res) => {
 });
 
 // update status to send
-router.get('/api/updateStatusToSend/:billSaleId', async (req, res) => {
+router.get('/updateStatusToSend/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -139,7 +139,7 @@ router.get('/api/updateStatusToSend/:billSaleId', async (req, res) => {
 });
 
 // update status to cancel
-router.get('/api/updateStatusToCancel/:billSaleId', async (req, res) => {
+router.get('/updateStatusToCancel/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -160,7 +160,7 @@ router.get('/api/updateStatusToCancel/:billSaleId', async (req, res) => {
 });
 
 // DashBoard
-router.get('/api/dashboard', async (req, res) => {
+router.get('/dashboard', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
