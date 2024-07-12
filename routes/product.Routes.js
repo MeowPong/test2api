@@ -3,11 +3,7 @@ const sql = require('mssql');
 const router = express.Router();
 const fileUpload = require('express-fileupload');
 const exceljs = require('exceljs');
-const { BlobServiceClient } = require('@azure/storage-blob');
-
-// Azure BLOB Storage
-const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = 'teddyblobstoragecontainer';
+const fs = require('fs');
 
 // Import the database configuration
 const config = require('../config/dbConfig');
@@ -103,12 +99,12 @@ router.put('/product/update', async (req, res) => {
                 WHERE id = @id
             `);
 
-        // Remove old image from Blob Storage
+        // Remove old image
         if (oldData.recordset[0].img) {
-            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-            const containerClient = blobServiceClient.getContainerClient(containerName);
-            const blockBlobClient = containerClient.getBlockBlobClient(oldData.recordset[0].img);
-            await blockBlobClient.delete();
+            const imagePath = './uploads' + oldData.recordset[0].img;
+            if (fs.existsSync(imagePath)) {
+                await fs.promises.unlink(imagePath);
+            }
         }
 
         // Update product
@@ -141,24 +137,8 @@ router.post('/product/upload', async (req, res) => {
             const myDate = new Date();
             const newName = `${myDate.getFullYear()}${myDate.getMonth()+1}${myDate.getDate()}${myDate.getHours()}${myDate.getMinutes()}${myDate.getSeconds()}${myDate.getMilliseconds()}.${img.name.split('.').pop()}`;
 
-            // Create the BlobServiceClient object
-            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-
-            // Get a reference to a container
-            const containerClient = blobServiceClient.getContainerClient(containerName);
-
-            // Create a blob client for the new blob
-            const blockBlobClient = containerClient.getBlockBlobClient(newName);
-
-            // Upload data to the blob
-            const uploadBlobResponse = await blockBlobClient.upload(img.data, img.data.length);
-
-            console.log(`Upload block blob ${newName} successfully`, uploadBlobResponse.requestId);
-
-            // Get the URL of the uploaded blob
-            const blobUrl = blockBlobClient.url;
-
-            res.send({ newName: newName, url: blobUrl });
+            await img.mv('./uploads/' + newName);
+            res.send({ newName: newName });
         } else {
             res.status(400).send('No image uploaded');
         }
@@ -173,18 +153,10 @@ router.post('/product/uploadFromExcel', async (req, res) => {
     try {
         if (req.files && req.files.fileExcel) {
             const fileExcel = req.files.fileExcel;
-            const blobName = `excel_${Date.now()}.xlsx`;
+            await fileExcel.mv('./uploads/' + fileExcel.name);
 
-            // Upload Excel file to Blob Storage
-            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-            const containerClient = blobServiceClient.getContainerClient(containerName);
-            const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-            await blockBlobClient.upload(fileExcel.data, fileExcel.data.length);
-
-            // Read the Excel file from Blob Storage
             const workbook = new exceljs.Workbook();
-            const blobDownloadResponse = await blockBlobClient.download();
-            await workbook.xlsx.read(blobDownloadResponse.readableStreamBody);
+            await workbook.xlsx.readFile('./uploads/' + fileExcel.name);
 
             const ws = workbook.getWorksheet(1);
 
@@ -209,9 +181,7 @@ router.post('/product/uploadFromExcel', async (req, res) => {
                 }
             }
 
-            // Delete the Excel file from Blob Storage after processing
-            await blockBlobClient.delete();
-
+            await fs.promises.unlink('./uploads/' + fileExcel.name);
             res.send({ message: 'success' });
         } else {
             res.status(400).send({ message: 'No Excel file uploaded' });
