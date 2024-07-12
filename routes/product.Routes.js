@@ -14,7 +14,79 @@ const config = require('../config/dbConfig');
 
 router.use(fileUpload());
 
-// ... (keep the create, list, and delete routes as they are)
+// create new product
+router.post("/product/create", async (req, res) => {
+    try {
+        await sql.connect(config);
+        const request = new sql.Request();
+        
+        await request
+            .input('name', sql.NVarChar, req.body.name)
+            .input('cost', sql.Decimal(10, 2), req.body.cost)
+            .input('price', sql.Decimal(10, 2), req.body.price)
+            .input('img', sql.NVarChar, req.body.img || '')
+            .input('status', sql.NVarChar, 'use')
+            .query(`
+                INSERT INTO Product (name, cost, price, img, status)
+                VALUES (@name, @cost, @price, @img, @status)
+            `);
+
+        res.send({ message: 'success' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).send({ error: e.message });
+    } finally {
+        await sql.close();
+    }
+});
+
+// get all product
+router.get('/product/list', async (req, res) => {
+    try {
+        await sql.connect(config);
+        
+        const request = new sql.Request();
+        const result = await request
+            .input('status', sql.NVarChar, 'use')
+            .query(`
+                SELECT *
+                FROM Product
+                WHERE status = @status
+                ORDER BY id DESC
+            `);
+        
+        res.send({ results: result.recordset });
+    } catch (e) {
+        console.error(e);
+        res.status(500).send({ error: e.message });
+    } finally {
+        await sql.close();
+    }
+});
+
+// delete product
+router.delete('/product/remove/:id', async (req, res) => {
+    try {
+        await sql.connect(config);
+        const request = new sql.Request();
+        
+        await request
+            .input('id', sql.Int, parseInt(req.params.id))
+            .input('status', sql.NVarChar, 'delete')
+            .query(`
+                UPDATE Product
+                SET status = @status
+                WHERE id = @id
+            `);
+
+        res.send({ message: 'success' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).send({ error: e.message });
+    } finally {
+        await sql.close();
+    }
+});
 
 // update product detail
 router.put('/product/update', async (req, res) => {
