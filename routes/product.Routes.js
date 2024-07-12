@@ -11,7 +11,7 @@ const config = require('../config/dbConfig');
 router.use(fileUpload());
 
 // create new product
-router.post("/create", async (req, res) => {
+router.post("/product/create", async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -37,7 +37,7 @@ router.post("/create", async (req, res) => {
 });
 
 // get all product
-router.get('/list', async (req, res) => {
+router.get('/product/list', async (req, res) => {
     try {
         await sql.connect(config);
         
@@ -61,7 +61,7 @@ router.get('/list', async (req, res) => {
 });
 
 // delete product
-router.delete('/remove/:id', async (req, res) => {
+router.delete('/product/remove/:id', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -85,7 +85,7 @@ router.delete('/remove/:id', async (req, res) => {
 });
 
 // update product detail
-router.put('/update', async (req, res) => {
+router.put('/product/update', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -130,7 +130,7 @@ router.put('/update', async (req, res) => {
 });
 
 // upload image and set new file name by date
-router.post('/upload', async (req, res) => {
+router.post('/product/upload', async (req, res) => {
     try {
         if (req.files && req.files.img) {
             const img = req.files.img;
@@ -149,7 +149,7 @@ router.post('/upload', async (req, res) => {
 });
 
 // upload Excel file
-router.post('/uploadFromExcel', async (req, res) => {
+router.post('/product/uploadFromExcel', async (req, res) => {
     try {
         if (req.files && req.files.fileExcel) {
             const fileExcel = req.files.fileExcel;
