@@ -2,16 +2,12 @@
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
-const { BlobServiceClient } = require('@azure/storage-blob');
 require('dotenv').config();
 
 const app = express();
 
 const port = process.env.PORT || 3000;
 
-// Azure BLOB Storage
-const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = 'teddyblobstoragecontainer';
 
 // Middlewares
 app.use(cors());
