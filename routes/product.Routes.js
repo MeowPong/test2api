@@ -5,11 +5,16 @@ const fileUpload = require('express-fileupload');
 const exceljs = require('exceljs');
 const fs = require('fs');
 const { uploadBlob, deleteBlob } = require('../services/azureBlobService');
+const multer = require('multer');
+
 
 // Import the database configuration
 const config = require('../config/dbConfig');
 
 router.use(fileUpload());
+
+// multer แทน express file upload
+const upload = multer({ storage: multer.memoryStorage() });
 
 // create new product
 router.post("/product/create", async (req, res) => {
@@ -86,7 +91,7 @@ router.delete('/product/remove/:id', async (req, res) => {
 });
 
 // update product detail
-router.put('/product/update', async (req, res) => {
+router.put('/product/update', upload.single('img'), async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -100,9 +105,19 @@ router.put('/product/update', async (req, res) => {
                 WHERE id = @id
             `);
 
-        // Remove old image from Azure Blob Storage
-        if (oldData.recordset[0].img) {
-            await deleteBlob(oldData.recordset[0].img);
+        let newImageUrl = oldData.recordset[0].img;
+
+        // Handle new image upload if provided
+        if (req.file) {
+            // Remove old image from Azure Blob Storage
+            if (oldData.recordset[0].img) {
+                await deleteBlob(oldData.recordset[0].img);
+            }
+
+            // Upload new image
+            const myDate = new Date();
+            const newName = `${myDate.getFullYear()}${myDate.getMonth()+1}${myDate.getDate()}${myDate.getHours()}${myDate.getMinutes()}${myDate.getSeconds()}${myDate.getMilliseconds()}.${req.file.originalname.split('.').pop()}`;
+            newImageUrl = await uploadBlob(newName, req.file.buffer);
         }
 
         // Update product
@@ -111,7 +126,7 @@ router.put('/product/update', async (req, res) => {
             .input('name', sql.NVarChar, req.body.name)
             .input('cost', sql.Decimal(10, 2), req.body.cost)
             .input('price', sql.Decimal(10, 2), req.body.price)
-            .input('img', sql.NVarChar, req.body.img || '')
+            .input('img', sql.NVarChar, newImageUrl)
             .query(`
                 UPDATE Product
                 SET name = @name, cost = @cost, price = @price, img = @img
@@ -128,41 +143,66 @@ router.put('/product/update', async (req, res) => {
 });
 
 // upload image and set new file name by date
-router.post('/product/upload', async (req, res) => {
+router.post('/product/upload', upload.single('img'), async (req, res) => {
     try {
-        if (req.files && req.files.img) {
-            const img = req.files.img;
+        console.log('Upload request received');
+        
+        if (req.file) {
+            console.log('Image file:', req.file.originalname);
+            
             const myDate = new Date();
-            const newName = `${myDate.getFullYear()}${myDate.getMonth()+1}${myDate.getDate()}${myDate.getHours()}${myDate.getMinutes()}${myDate.getSeconds()}${myDate.getMilliseconds()}.${img.name.split('.').pop()}`;
+            const newName = `${myDate.getFullYear()}${myDate.getMonth()+1}${myDate.getDate()}${myDate.getHours()}${myDate.getMinutes()}${myDate.getSeconds()}${myDate.getMilliseconds()}.${req.file.originalname.split('.').pop()}`;
+            console.log('New file name:', newName);
 
-            const blobUrl = await uploadBlob(newName, img.data);
+            console.log('Uploading to blob storage...');
+            const blobUrl = await uploadBlob(newName, req.file.buffer);
+            console.log('Blob URL:', blobUrl);
+            
             res.send({ newName: newName, url: blobUrl });
         } else {
+            console.log('No image file found in request');
             res.status(400).send('No image uploaded');
         }
     } catch (e) {
-        console.error(e);
+        console.error('Error in /product/upload:', e);
         res.status(500).send({ error: e.message });
     }
 });
 
 // upload Excel file
-router.post('/product/uploadFromExcel', async (req, res) => {
+router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, res) => {
     try {
-        if (req.files && req.files.fileExcel) {
-            const fileExcel = req.files.fileExcel;
+        if (req.file) {
             const blobName = `excel_${Date.now()}.xlsx`;
-            await uploadBlob(blobName, fileExcel.data);
+            await uploadBlob(blobName, req.file.buffer);
 
             const workbook = new exceljs.Workbook();
-            await workbook.xlsx.load(fileExcel.data);
+            await workbook.xlsx.load(req.file.buffer);
 
             const ws = workbook.getWorksheet(1);
 
             await sql.connect(config);
             const request = new sql.Request();
 
-            // ... (rest of the Excel processing code remains the same)
+            // Assuming the Excel structure is: Name, Cost, Price, Image URL
+            for (let i = 2; i <= ws.rowCount; i++) {
+                const row = ws.getRow(i);
+                const name = row.getCell(1).value;
+                const cost = row.getCell(2).value;
+                const price = row.getCell(3).value;
+                const img = row.getCell(4).value || '';
+
+                await request
+                    .input('name', sql.NVarChar, name)
+                    .input('cost', sql.Decimal(10, 2), cost)
+                    .input('price', sql.Decimal(10, 2), price)
+                    .input('img', sql.NVarChar, img)
+                    .input('status', sql.NVarChar, 'use')
+                    .query(`
+                        INSERT INTO Product (name, cost, price, img, status)
+                        VALUES (@name, @cost, @price, @img, @status)
+                    `);
+            }
 
             await deleteBlob(blobName);
             res.send({ message: 'success' });
