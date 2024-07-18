@@ -1,37 +1,49 @@
 const express = require('express');
 const sql = require('mssql');
 const router = express.Router();
-const fileUpload = require('express-fileupload');
 const exceljs = require('exceljs');
 const fs = require('fs');
-const { uploadBlob, deleteBlob } = require('../services/azureBlobService');
+const { BlobServiceClient } = require("@azure/storage-blob");
 const multer = require('multer');
 
 
 // Import the database configuration
 const config = require('../config/dbConfig');
 
-router.use(fileUpload());
 
 // multer แทน express file upload
 const upload = multer({ storage: multer.memoryStorage() });
 
 
 // Azure Blob Storage setup
-  // Assume you have your connection string in an environment variable
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-
-  // Create the BlobServiceClient object
 const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
-
-  // Get a reference to a container
 const containerName = 'uploads';
 const containerClient = blobServiceClient.getContainerClient(containerName);
 
+// Helper function to upload file to Azure Blob Storage
+async function uploadToBlob(file, blobName) {
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    await blockBlobClient.upload(file.buffer, file.buffer.length);
+    return blockBlobClient.url;
+}
+
+// Helper function to delete file from Azure Blob Storage
+async function deleteFromBlob(blobName) {
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    await blockBlobClient.delete();
+}
+
 
 // create new product
-router.post("/product/create", async (req, res) => {
+router.post("/product/create", upload.single('img'), async (req, res) => {
     try {
+        let imageUrl = '';
+        if (req.file) {
+            const blobName = `product_${Date.now()}.${req.file.originalname.split('.').pop()}`;
+            imageUrl = await uploadToBlob(req.file, blobName);
+        }
+
         await sql.connect(config);
         const request = new sql.Request();
         
@@ -39,14 +51,14 @@ router.post("/product/create", async (req, res) => {
             .input('name', sql.NVarChar, req.body.name)
             .input('cost', sql.Decimal(10, 2), req.body.cost)
             .input('price', sql.Decimal(10, 2), req.body.price)
-            .input('img', sql.NVarChar, req.body.img || '')
+            .input('img', sql.NVarChar, imageUrl)
             .input('status', sql.NVarChar, 'use')
             .query(`
                 INSERT INTO Product (name, cost, price, img, status)
                 VALUES (@name, @cost, @price, @img, @status)
             `);
 
-        res.send({ message: 'success' });
+        res.send({ message: 'success', imageUrl });
     } catch (e) {
         console.error(e);
         res.status(500).send({ error: e.message });
@@ -54,6 +66,7 @@ router.post("/product/create", async (req, res) => {
         await sql.close();
     }
 });
+
 
 // get all product
 router.get('/product/list', async (req, res) => {
@@ -110,7 +123,6 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
         console.log('Updating product. Request body:', req.body);
         console.log('File:', req.file);
 
-        // Input validation
         if (!req.body.id || !req.body.name || req.body.cost === undefined || req.body.price === undefined) {
             return res.status(400).send({ error: 'Missing required fields' });
         }
@@ -118,7 +130,6 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
         connection = await sql.connect(config);
         const request = new sql.Request(connection);
 
-        // Get old data
         const oldData = await request
             .input('id', sql.Int, parseInt(req.body.id))
             .query(`
@@ -133,29 +144,16 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
 
         let newImageUrl = oldData.recordset[0].img;
 
-        // Handle file upload if a new image is provided
         if (req.file) {
             const blobName = `product_${req.body.id}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
-            const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-            
-            console.log('\nUploading to Azure storage as blob:\n\t', blobName);
+            newImageUrl = await uploadToBlob(req.file, blobName);
 
-            // Upload data to the blob
-            const uploadBlobResponse = await blockBlobClient.upload(req.file.buffer, req.file.buffer.length);
-            console.log(`Blob was uploaded successfully. requestId: ${uploadBlobResponse.requestId}`);
-            
-            newImageUrl = blockBlobClient.url;
-
-            // Delete old image if it exists
             if (oldData.recordset[0].img) {
                 const oldBlobName = oldData.recordset[0].img.split('/').pop();
-                const oldBlockBlobClient = containerClient.getBlockBlobClient(oldBlobName);
-                await oldBlockBlobClient.delete();
-                console.log(`Old blob ${oldBlobName} was deleted successfully.`);
+                await deleteFromBlob(oldBlobName);
             }
         }
 
-        // Update product
         const result = await request
             .input('id', sql.Int, parseInt(req.body.id))
             .input('name', sql.NVarChar, req.body.name)
@@ -187,6 +185,7 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
     }
 });
 
+
 // upload image and set new file name by date
 router.post('/product/upload', upload.single('img'), async (req, res) => {
     try {
@@ -202,17 +201,7 @@ router.post('/product/upload', upload.single('img'), async (req, res) => {
         const blobName = `product_${Date.now()}_${req.file.originalname}`;
         console.log('New blob name:', blobName);
 
-        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-        
-        console.log('Uploading to Azure Blob storage...');
-        const uploadBlobResponse = await blockBlobClient.upload(
-            req.file.buffer, 
-            req.file.buffer.length
-        );
-        console.log('Blob uploaded successfully:', uploadBlobResponse.requestId);
-        
-        // Get the URL of the uploaded blob
-        const imageUrl = blockBlobClient.url;
+        const imageUrl = await uploadToBlob(req.file, blobName);
         
         res.status(200).json({ 
             message: 'Image uploaded successfully',
@@ -227,6 +216,7 @@ router.post('/product/upload', upload.single('img'), async (req, res) => {
         });
     }
 });
+
 
 // upload Excel file
 router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, res) => {
@@ -243,9 +233,7 @@ router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, 
 
         // Upload Excel file to Azure Blob Storage
         const blobName = `excel_${Date.now()}.xlsx`;
-        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-        await blockBlobClient.upload(req.file.buffer, req.file.buffer.length);
-        console.log('Excel file uploaded to Azure Blob Storage:', blobName);
+        const excelUrl = await uploadToBlob(req.file, blobName);
 
         // Process Excel file
         const workbook = new exceljs.Workbook();
@@ -276,7 +264,7 @@ router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, 
         });
 
         // Delete the Excel file from Azure Blob Storage
-        await blockBlobClient.delete();
+        await deleteFromBlob(blobName);
         console.log('Excel file deleted from Azure Blob Storage');
 
         res.status(200).json({
