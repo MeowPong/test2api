@@ -288,4 +288,20 @@ router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, 
     }
 });
 
+
+// test Blob Storage
+router.get('/test-blob-storage', async (req, res) => {
+    try {
+        const testBlobName = `test-${Date.now()}.txt`;
+        const blockBlobClient = containerClient.getBlockBlobClient(testBlobName);
+        await blockBlobClient.upload('Test content', 'Test content'.length);
+        await blockBlobClient.delete();
+        res.send('Blob storage test successful');
+    } catch (error) {
+        console.error('Blob storage test failed:', error);
+        res.status(500).send('Blob storage test failed: ' + error.message);
+    }
+});
+
+
 module.exports = router;
