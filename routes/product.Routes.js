@@ -293,7 +293,7 @@ router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, 
 router.get('/test-blob-storage', async (req, res) => {
     try {
         const testBlobName = `test-${Date.now()}.txt`;
-        const blockBlobClient = containerClient.getBlockBlobClient(testBlobName);
+        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
         await blockBlobClient.upload('Test content', 'Test content'.length);
         await blockBlobClient.delete();
         res.send('Blob storage test successful');
