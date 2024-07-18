@@ -6,7 +6,7 @@ const router = express.Router();
 const config = require('../config/dbConfig');
 
 // save order
-router.post('/save', async (req, res) => {
+router.post('/sale/save', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -56,7 +56,7 @@ router.post('/save', async (req, res) => {
 
 
 // Sale Bill Report
-router.get('/list', async (req, res) => {
+router.get('/sale/list', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -74,7 +74,7 @@ router.get('/list', async (req, res) => {
 });
 
 // bill info
-router.get('/billInfo/:billSaleId', async (req, res) => {
+router.get('/sale/billInfo/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -97,7 +97,7 @@ router.get('/billInfo/:billSaleId', async (req, res) => {
 });
 
 // update bill status to pay
-router.get('/updateStatusToPay/:billSaleId', async (req, res) => {
+router.get('/sale/updateStatusToPay/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -118,7 +118,7 @@ router.get('/updateStatusToPay/:billSaleId', async (req, res) => {
 });
 
 // update status to send
-router.get('/updateStatusToSend/:billSaleId', async (req, res) => {
+router.get('/sale/updateStatusToSend/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -139,7 +139,7 @@ router.get('/updateStatusToSend/:billSaleId', async (req, res) => {
 });
 
 // update status to cancel
-router.get('/updateStatusToCancel/:billSaleId', async (req, res) => {
+router.get('/sale/updateStatusToCancel/:billSaleId', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
@@ -160,7 +160,7 @@ router.get('/updateStatusToCancel/:billSaleId', async (req, res) => {
 });
 
 // DashBoard
-router.get('/dashboard', async (req, res) => {
+router.get('/sale/dashboard', async (req, res) => {
     try {
         await sql.connect(config);
         const request = new sql.Request();
