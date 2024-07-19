@@ -20,7 +20,7 @@ const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_C
 const containerName = 'uploads';
 const containerClient = blobServiceClient.getContainerClient(containerName);
 
-const AZURE_STORAGE_URL = process.env.AZURE_STORAGE_URL;
+const AZURE_STORAGE_URL = 'https://meowpongstorage.blob.core.windows.net'
 
 // Helper function to upload file to Azure Blob Storage
 async function uploadToBlob(file, blobName) {
