@@ -14,18 +14,19 @@ const config = require('../config/dbConfig');
 // multer แทน express file upload
 const upload = multer({ storage: multer.memoryStorage() });
 
-
 // Azure Blob Storage setup
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
 const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
 const containerName = 'uploads';
 const containerClient = blobServiceClient.getContainerClient(containerName);
 
+const AZURE_STORAGE_URL = process.env.AZURE_STORAGE_URL;
+
 // Helper function to upload file to Azure Blob Storage
 async function uploadToBlob(file, blobName) {
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     await blockBlobClient.upload(file.buffer, file.buffer.length);
-    return blockBlobClient.url;
+    return `${AZURE_STORAGE_URL}/${containerName}/${blobName}`;
 }
 
 // Helper function to delete file from Azure Blob Storage
@@ -77,7 +78,12 @@ router.get('/product/list', async (req, res) => {
         const result = await request
             .input('status', sql.NVarChar, 'use')
             .query(`
-                SELECT *
+                SELECT id, name, cost, price, 
+                       CASE 
+                           WHEN img LIKE 'http%' THEN img 
+                           ELSE CONCAT('${AZURE_STORAGE_URL}/${containerName}/', img) 
+                       END AS img,
+                       status
                 FROM Product
                 WHERE status = @status
                 ORDER BY id DESC
