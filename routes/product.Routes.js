@@ -11,7 +11,7 @@ const multer = require('multer');
 const config = require('../config/dbConfig');
 
 
-// multer แทน express file upload
+// Multer setup for file upload
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Azure Blob Storage setup
@@ -23,26 +23,26 @@ const containerClient = blobServiceClient.getContainerClient(containerName);
 const AZURE_STORAGE_URL = 'https://meowpongstorage.blob.core.windows.net'
 
 // Helper function to upload file to Azure Blob Storage
-async function uploadToBlob(file, blobName) {
+async function uploadToBlob(file) {
+    const blobName = `product_${Date.now()}_${file.originalname}`;
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     await blockBlobClient.upload(file.buffer, file.buffer.length);
-    return `${AZURE_STORAGE_URL}/${containerName}/${blobName}`;
+    return blockBlobClient.url;
 }
 
 // Helper function to delete file from Azure Blob Storage
-async function deleteFromBlob(blobName) {
+async function deleteFromBlob(url) {
+    const blobName = url.split('/').pop();
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     await blockBlobClient.delete();
 }
-
 
 // create new product
 router.post("/product/create", upload.single('img'), async (req, res) => {
     try {
         let imageUrl = '';
         if (req.file) {
-            const blobName = `product_${Date.now()}.${req.file.originalname.split('.').pop()}`;
-            imageUrl = await uploadToBlob(req.file, blobName);
+            imageUrl = await uploadToBlob(req.file);
         }
 
         await sql.connect(config);
@@ -151,12 +151,10 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
         let newImageUrl = oldData.recordset[0].img;
 
         if (req.file) {
-            const blobName = `product_${req.body.id}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
-            newImageUrl = await uploadToBlob(req.file, blobName);
+            newImageUrl = await uploadToBlob(req.file);
 
             if (oldData.recordset[0].img) {
-                const oldBlobName = oldData.recordset[0].img.split('/').pop();
-                await deleteFromBlob(oldBlobName);
+                await deleteFromBlob(oldData.recordset[0].img);
             }
         }
 
@@ -204,15 +202,11 @@ router.post('/product/upload', upload.single('img'), async (req, res) => {
 
         console.log('Image file:', req.file.originalname);
         
-        const blobName = `product_${Date.now()}_${req.file.originalname}`;
-        console.log('New blob name:', blobName);
-
-        const imageUrl = await uploadToBlob(req.file, blobName);
+        const imageUrl = await uploadToBlob(req.file);
         
         res.status(200).json({ 
             message: 'Image uploaded successfully',
-            imageUrl: imageUrl,
-            blobName: blobName
+            imageUrl: imageUrl
         });
     } catch (error) {
         console.error('Error in /product/upload:', error);
