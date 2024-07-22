@@ -1,7 +1,7 @@
 const { BlobServiceClient } = require("@azure/storage-blob");
 
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = "uploads"; // You can change this to your preferred container name
+const containerName = "uploads"; // can change container name
 
 const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
 const containerClient = blobServiceClient.getContainerClient(containerName);

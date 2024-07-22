@@ -5,6 +5,7 @@ const exceljs = require('exceljs');
 const fs = require('fs');
 const { BlobServiceClient } = require("@azure/storage-blob");
 const multer = require('multer');
+const { body, validationResult } = require('express-validator');
 
 
 // Import the database configuration
@@ -20,14 +21,14 @@ const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_C
 const containerName = 'uploads';
 const containerClient = blobServiceClient.getContainerClient(containerName);
 
-const AZURE_STORAGE_URL = 'https://meowpongstorage.blob.core.windows.net'
+const AZURE_STORAGE_URL = 'https://meowpongstorage.blob.core.windows.net';
 
 // Helper function to upload file to Azure Blob Storage
 async function uploadToBlob(file) {
     const blobName = `product_${Date.now()}_${file.originalname}`;
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     await blockBlobClient.upload(file.buffer, file.buffer.length);
-    return blockBlobClient.url;
+    return `${AZURE_STORAGE_URL}/${containerName}/${blobName}`;
 }
 
 // Helper function to delete file from Azure Blob Storage
@@ -37,8 +38,17 @@ async function deleteFromBlob(url) {
     await blockBlobClient.delete();
 }
 
-// create new product
-router.post("/product/create", upload.single('img'), async (req, res) => {
+// Create new product
+router.post("/product/create", upload.single('img'), [
+    body('name').isString().notEmpty(),
+    body('cost').isDecimal(),
+    body('price').isDecimal()
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         let imageUrl = '';
         if (req.file) {
@@ -68,8 +78,7 @@ router.post("/product/create", upload.single('img'), async (req, res) => {
     }
 });
 
-
-// get all product
+// Get all products
 router.get('/product/list', async (req, res) => {
     try {
         await sql.connect(config);
@@ -78,12 +87,7 @@ router.get('/product/list', async (req, res) => {
         const result = await request
             .input('status', sql.NVarChar, 'use')
             .query(`
-                SELECT id, name, cost, price, 
-                       CASE 
-                           WHEN img LIKE 'http%' THEN img 
-                           ELSE CONCAT('${AZURE_STORAGE_URL}/${containerName}/', img) 
-                       END AS img,
-                       status
+                SELECT id, name, cost, price, img, status
                 FROM Product
                 WHERE status = @status
                 ORDER BY id DESC
@@ -98,7 +102,7 @@ router.get('/product/list', async (req, res) => {
     }
 });
 
-// delete product
+// Delete product
 router.delete('/product/remove/:id', async (req, res) => {
     try {
         await sql.connect(config);
@@ -122,17 +126,20 @@ router.delete('/product/remove/:id', async (req, res) => {
     }
 });
 
-// update product detail
-router.put('/product/update', upload.single('img'), async (req, res) => {
+// Update product details
+router.put('/product/update', upload.single('img'), [
+    body('id').isInt(),
+    body('name').isString().notEmpty(),
+    body('cost').isDecimal(),
+    body('price').isDecimal()
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     let connection;
     try {
-        console.log('Updating product. Request body:', req.body);
-        console.log('File:', req.file);
-
-        if (!req.body.id || !req.body.name || req.body.cost === undefined || req.body.price === undefined) {
-            return res.status(400).send({ error: 'Missing required fields' });
-        }
-
         connection = await sql.connect(config);
         const request = new sql.Request(connection);
 
@@ -189,31 +196,18 @@ router.put('/product/update', upload.single('img'), async (req, res) => {
     }
 });
 
-
-// upload image and set new file name by date
-router.post('/product/upload', upload.single('img'), async (req, res) => {
+// Upload image
+router.post("/upload", upload.single('img'), async (req, res) => {
     try {
-        console.log('Upload request received');
-        
         if (!req.file) {
-            console.log('No image file found in request');
-            return res.status(400).send('No image uploaded');
+            return res.status(400).send({ error: 'No file uploaded' });
         }
 
-        console.log('Image file:', req.file.originalname);
-        
         const imageUrl = await uploadToBlob(req.file);
-        
-        res.status(200).json({ 
-            message: 'Image uploaded successfully',
-            imageUrl: imageUrl
-        });
-    } catch (error) {
-        console.error('Error in /product/upload:', error);
-        res.status(500).json({ 
-            error: 'An error occurred during file upload',
-            details: error.message
-        });
+        res.send({ message: 'success', imageUrl });
+    } catch (e) {
+        console.error(e);
+        res.status(500).send({ error: e.message });
     }
 });
 
