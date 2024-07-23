@@ -5,12 +5,9 @@ const exceljs = require('exceljs');
 const fs = require('fs');
 const { BlobServiceClient } = require("@azure/storage-blob");
 const multer = require('multer');
-const { body, validationResult } = require('express-validator');
-
 
 // Import the database configuration
 const config = require('../config/dbConfig');
-
 
 // Multer setup for file upload
 const upload = multer({ storage: multer.memoryStorage() });
@@ -39,16 +36,7 @@ async function deleteFromBlob(url) {
 }
 
 // Create new product
-router.post("/product/create", upload.single('img'), [
-    body('name').isString().notEmpty(),
-    body('cost').isDecimal(),
-    body('price').isDecimal()
-], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-
+router.post("/product/create", upload.single('img'), async (req, res) => {
     try {
         let imageUrl = '';
         if (req.file) {
@@ -127,17 +115,7 @@ router.delete('/product/remove/:id', async (req, res) => {
 });
 
 // Update product details
-router.put('/product/update', upload.single('img'), [
-    body('id').isInt(),
-    body('name').isString().notEmpty(),
-    body('cost').isDecimal(),
-    body('price').isDecimal()
-], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-
+router.put('/product/update', upload.single('img'), async (req, res) => {
     let connection;
     try {
         connection = await sql.connect(config);
@@ -211,8 +189,7 @@ router.post("/upload", upload.single('img'), async (req, res) => {
     }
 });
 
-
-// upload Excel file
+// Upload Excel file
 router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, res) => {
     let connection;
     try {
@@ -282,9 +259,7 @@ router.post('/product/uploadFromExcel', upload.single('fileExcel'), async (req, 
     }
 });
 
-
-// test Blob Storage 
-//await blockBlobClient.delete();
+// Test Blob Storage 
 router.get('/test-blob-storage', async (req, res) => {
     try {
         const testBlobName = `test-${Date.now()}.txt`;
@@ -297,6 +272,5 @@ router.get('/test-blob-storage', async (req, res) => {
         res.status(500).send('Blob storage test failed: ' + error.message);
     }
 });
-
 
 module.exports = router;
